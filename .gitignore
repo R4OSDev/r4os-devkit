@@ -1,0 +1,19 @@
+# Lokal installierte Inhalte
+/SDK/
+/Toolchains/
+/Boot/
+/Emulation/
+/HostTools/
+
+# Temporaere Setup-Daten
+/Setup/.Setup_*/
+
+# OS- und Editor-Muell
+Thumbs.db
+.DS_Store
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
