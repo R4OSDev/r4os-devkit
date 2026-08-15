@@ -4,6 +4,7 @@
 /Boot/
 /Emulation/
 /HostTools/
+/.Cache/
 
 # Temporaere Setup-Daten
 /Setup/.Setup_*/
