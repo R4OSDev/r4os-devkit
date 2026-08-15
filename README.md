@@ -30,3 +30,9 @@ passende Installationen und bereits aktuelle HostTools bei.
 Die Checkouts unter `SDK\` und `HostTools\Source\` sind installierte
 Arbeitskopien. Fachliche Aenderungen und Commits erfolgen weiterhin in den
 jeweiligen Quell-Repositories, nicht innerhalb des DevKits.
+
+## Lizenz
+
+Die originalen DevKit-Skripte stehen unter der Apache License 2.0; siehe
+`LICENSE` und `NOTICE`. Heruntergeladene Werkzeuge wie Zig, Limine und QEMU
+sind nicht Bestandteil dieses Repositorys und behalten ihre eigenen Lizenzen.
