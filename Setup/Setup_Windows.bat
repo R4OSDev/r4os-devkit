@@ -345,7 +345,7 @@ echo Verifying %~4...
 set "R4OS_SETUP_HASH_FILE=%~1"
 set "R4OS_SETUP_HASH_ALGORITHM=%~2"
 set "ACTUAL_HASH="
-for /f "usebackq delims=" %%H in (`powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "(Get-FileHash -LiteralPath $env:R4OS_SETUP_HASH_FILE -Algorithm $env:R4OS_SETUP_HASH_ALGORITHM).Hash.ToLowerInvariant()"`) do set "ACTUAL_HASH=%%H"
+for /f "usebackq delims=" %%H in (`powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$algorithm = [Security.Cryptography.HashAlgorithm]::Create($env:R4OS_SETUP_HASH_ALGORITHM); if ($null -eq $algorithm) { exit 1 }; $stream = [IO.File]::OpenRead($env:R4OS_SETUP_HASH_FILE); try { $hash = $algorithm.ComputeHash($stream); [BitConverter]::ToString($hash).Replace('-','').ToLowerInvariant() } finally { $stream.Dispose(); $algorithm.Dispose() }"`) do set "ACTUAL_HASH=%%H"
 if not defined ACTUAL_HASH (
     echo [ERROR] Could not calculate the checksum for %~4.
     exit /b 1
