@@ -64,7 +64,8 @@ set "SEVENZIP_SHA256=6745fa76dc2ea031596d8678f6f6b99c3c1b435b4164a63485adbbc7b8d
 
 set "CONTRACT_REPOSITORY_URL=https://github.com/R4OSDev/r4os-contract.git"
 set "SDK_REPOSITORY_URL=https://github.com/R4OSDev/r4os-sdk.git"
-set "HOSTTOOLS_FORMAT=1"
+set "DISTRIBUTION_REPOSITORY_URL=https://github.com/R4OSDev/r4os-distribution.git"
+set "HOSTTOOLS_FORMAT=2"
 
 set "ZIG_TARGET=!DEVKIT_ROOT!\Toolchains\Zig"
 set "LIMINE_TARGET=!DEVKIT_ROOT!\Boot\Limine"
@@ -72,6 +73,7 @@ set "QEMU_TARGET=!DEVKIT_ROOT!\Emulation\QEMU"
 set "CONTRACT_TARGET=!DEVKIT_ROOT!\SDK\Contract"
 set "SDK_TARGET=!DEVKIT_ROOT!\SDK\Core"
 set "HOSTTOOLS_TARGET=!DEVKIT_ROOT!\HostTools"
+set "DISTRIBUTION_TARGET=!HOSTTOOLS_TARGET!\Source\Distribution"
 set "HOSTTOOLS_BIN=!HOSTTOOLS_TARGET!\bin"
 set "HOSTTOOLS_STATE=!HOSTTOOLS_TARGET!\.setup-state"
 set "CACHE_TARGET=!DEVKIT_ROOT!\.Cache"
@@ -120,10 +122,16 @@ if errorlevel 1 goto :failure
 call :sync_repository "!SDK_REPOSITORY_URL!" "!SDK_TARGET!" "SDK"
 if errorlevel 1 goto :failure
 
+call :sync_repository "!DISTRIBUTION_REPOSITORY_URL!" "!DISTRIBUTION_TARGET!" "Distribution"
+if errorlevel 1 goto :failure
+
 call :read_commit "!CONTRACT_TARGET!" "CONTRACT_COMMIT" "Contract"
 if errorlevel 1 goto :failure
 
 call :read_commit "!SDK_TARGET!" "SDK_COMMIT" "SDK"
+if errorlevel 1 goto :failure
+
+call :read_commit "!DISTRIBUTION_TARGET!" "DISTRIBUTION_COMMIT" "Distribution"
 if errorlevel 1 goto :failure
 
 call :check_host_tools
@@ -438,22 +446,32 @@ if not exist "!HOSTTOOLS_BIN!\api-contract-gen.exe" exit /b 0
 if not exist "!HOSTTOOLS_BIN!\r4l-contract-gen.exe" exit /b 0
 if not exist "!HOSTTOOLS_BIN!\r4xbuilder.exe" exit /b 0
 if not exist "!HOSTTOOLS_BIN!\module-catalog.exe" exit /b 0
+if not exist "!HOSTTOOLS_BIN!\imagecreater.exe" exit /b 0
+if not exist "!HOSTTOOLS_BIN!\ntfsverify.exe" exit /b 0
+if not exist "!HOSTTOOLS_BIN!\r4upack.exe" exit /b 0
+if not exist "!HOSTTOOLS_BIN!\seriallink-host.exe" exit /b 0
+if not exist "!HOSTTOOLS_BIN!\image-plan.exe" exit /b 0
+if not exist "!HOSTTOOLS_BIN!\preload-image.exe" exit /b 0
+if not exist "!HOSTTOOLS_BIN!\default-registry.exe" exit /b 0
 if not exist "!HOSTTOOLS_STATE!" exit /b 0
 
 set "INSTALLED_FORMAT="
 set "INSTALLED_CONTRACT_COMMIT="
 set "INSTALLED_SDK_COMMIT="
+set "INSTALLED_DISTRIBUTION_COMMIT="
 set "INSTALLED_ZIG_VERSION="
 for /f "usebackq tokens=1,* delims==" %%A in ("!HOSTTOOLS_STATE!") do (
     if /I "%%A"=="FORMAT" set "INSTALLED_FORMAT=%%B"
     if /I "%%A"=="CONTRACT_COMMIT" set "INSTALLED_CONTRACT_COMMIT=%%B"
     if /I "%%A"=="SDK_COMMIT" set "INSTALLED_SDK_COMMIT=%%B"
+    if /I "%%A"=="DISTRIBUTION_COMMIT" set "INSTALLED_DISTRIBUTION_COMMIT=%%B"
     if /I "%%A"=="ZIG_VERSION" set "INSTALLED_ZIG_VERSION=%%B"
 )
 
 if not "!INSTALLED_FORMAT!"=="!HOSTTOOLS_FORMAT!" exit /b 0
 if /I not "!INSTALLED_CONTRACT_COMMIT!"=="!CONTRACT_COMMIT!" exit /b 0
 if /I not "!INSTALLED_SDK_COMMIT!"=="!SDK_COMMIT!" exit /b 0
+if /I not "!INSTALLED_DISTRIBUTION_COMMIT!"=="!DISTRIBUTION_COMMIT!" exit /b 0
 if not "!INSTALLED_ZIG_VERSION!"=="!ZIG_VERSION!" exit /b 0
 
 set "INSTALL_HOSTTOOLS=0"
@@ -465,9 +483,11 @@ echo.
 echo === R4OS HostTools ===
 set "CONTRACT_BUILD_PREFIX=!TEMP_ROOT!\ContractTools"
 set "SDK_BUILD_PREFIX=!TEMP_ROOT!\SdkTools"
+set "DISTRIBUTION_BUILD_PREFIX=!TEMP_ROOT!\DistributionTools"
 set "ZIG_GLOBAL_CACHE=!CACHE_TARGET!\Zig\Global"
 set "CONTRACT_BUILD_CACHE=!CACHE_TARGET!\Zig\Contract"
 set "SDK_BUILD_CACHE=!CACHE_TARGET!\Zig\SDK"
+set "DISTRIBUTION_BUILD_CACHE=!CACHE_TARGET!\Zig\Distribution"
 
 echo Building ApiContractGen...
 pushd "!CONTRACT_TARGET!" >nul || exit /b 1
@@ -489,6 +509,16 @@ if not "!BUILD_EXIT_CODE!"=="0" (
     exit /b !BUILD_EXIT_CODE!
 )
 
+echo Building Distribution HostTools...
+pushd "!DISTRIBUTION_TARGET!" >nul || exit /b 1
+"!ZIG_TARGET!\zig.exe" build --cache-dir "!DISTRIBUTION_BUILD_CACHE!" --global-cache-dir "!ZIG_GLOBAL_CACHE!" --prefix "!DISTRIBUTION_BUILD_PREFIX!" -Doptimize=ReleaseSafe --fork="!SDK_TARGET!" --fork="!CONTRACT_TARGET!"
+set "BUILD_EXIT_CODE=!ERRORLEVEL!"
+popd
+if not "!BUILD_EXIT_CODE!"=="0" (
+    echo [ERROR] Could not build the Distribution HostTools.
+    exit /b !BUILD_EXIT_CODE!
+)
+
 if not exist "!HOSTTOOLS_BIN!" mkdir "!HOSTTOOLS_BIN!" >nul 2>&1
 if not exist "!HOSTTOOLS_BIN!" (
     echo [ERROR] Could not create !HOSTTOOLS_BIN!.
@@ -503,12 +533,27 @@ call :install_host_tool "!SDK_BUILD_PREFIX!\bin\r4xbuilder.exe"
 if errorlevel 1 exit /b 1
 call :install_host_tool "!SDK_BUILD_PREFIX!\bin\module-catalog.exe"
 if errorlevel 1 exit /b 1
+call :install_host_tool "!DISTRIBUTION_BUILD_PREFIX!\bin\imagecreater.exe"
+if errorlevel 1 exit /b 1
+call :install_host_tool "!DISTRIBUTION_BUILD_PREFIX!\bin\ntfsverify.exe"
+if errorlevel 1 exit /b 1
+call :install_host_tool "!DISTRIBUTION_BUILD_PREFIX!\bin\r4upack.exe"
+if errorlevel 1 exit /b 1
+call :install_host_tool "!DISTRIBUTION_BUILD_PREFIX!\bin\seriallink-host.exe"
+if errorlevel 1 exit /b 1
+call :install_host_tool "!DISTRIBUTION_BUILD_PREFIX!\bin\image-plan.exe"
+if errorlevel 1 exit /b 1
+call :install_host_tool "!DISTRIBUTION_BUILD_PREFIX!\bin\preload-image.exe"
+if errorlevel 1 exit /b 1
+call :install_host_tool "!DISTRIBUTION_BUILD_PREFIX!\bin\default-registry.exe"
+if errorlevel 1 exit /b 1
 
 set "HOSTTOOLS_STATE_TEMP=!TEMP_ROOT!\hosttools.state"
 > "!HOSTTOOLS_STATE_TEMP!" (
     echo FORMAT=!HOSTTOOLS_FORMAT!
     echo CONTRACT_COMMIT=!CONTRACT_COMMIT!
     echo SDK_COMMIT=!SDK_COMMIT!
+    echo DISTRIBUTION_COMMIT=!DISTRIBUTION_COMMIT!
     echo ZIG_VERSION=!ZIG_VERSION!
 )
 copy /Y "!HOSTTOOLS_STATE_TEMP!" "!HOSTTOOLS_STATE!" >nul
