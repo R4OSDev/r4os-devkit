@@ -1,38 +1,36 @@
 ﻿# R4OS DevKit
 
-Das R4OS DevKit stellt die lokale Entwicklungsumgebung fuer R4OS bereit. Das
-Repository enthaelt nur die Setup-Skripte; SDK, Contract, Toolchains und
-installierte Hostwerkzeuge werden lokal bezogen und nicht eingecheckt.
+The R4OS DevKit bootstraps a local development environment without committing
+downloaded toolchains or installed source checkouts.
 
-    SDK\Core\         Installiertes R4OS SDK
-    SDK\Contract\     Passender Plattform-Contract
-    Setup\            Plattformspezifische Setup-Skripte
-    Toolchains\Zig\   Zig-Toolchain
-    Boot\Limine\      Limine-Bootloader und Hostwerkzeug
-    Emulation\QEMU\   QEMU fuer Build- und Systemtests
-    HostTools\bin\    Gebaute R4OS-Hostwerkzeuge
-    HostTools\Source\ Installierte Hosttool-Quellen
+    SDK/Core/         Installed R4OS SDK
+    SDK/Contract/     Matching platform Contract
+    Setup/            Host-specific setup scripts
+    Toolchains/Zig/   Zig toolchain
+    Boot/Limine/      Limine bootloader and host tool
+    Emulation/QEMU/   QEMU for system tests
+    HostTools/bin/    Built R4OS host tools
+    HostTools/Source/ Installed host-tool sources
 
-Unter Windows richtet `Setup\Setup_Windows.bat` die festgelegten Versionen von
-Zig, Limine und QEMU ein. Danach klont beziehungsweise aktualisiert es die
-oeffentlichen Contract-, SDK- und Distribution-Repositories. Daraus baut es
-ApiContractGen, R4LContractGen, R4XBuilder, ModuleCatalog, ImageCreator,
-NtfsVerify, R4UPack, SerialLinkHost, ImagePlan, PreloadImage und
-DefaultRegistry. Git, curl und Windows PowerShell muessen auf dem Host
-vorhanden sein.
+## Windows setup
 
-Alle Ziel-, Temporaer- und Zig-Cachepfade liegen innerhalb des DevKits.
-Downloads werden per Pruefsumme kontrolliert, Repositoryupdates erfolgen nur
-als Fast-Forward auf `main`, und lokal veraenderte Installations-Checkouts
-werden nicht ueberschrieben. Ein unveraenderter erneuter Aufruf behaelt
-passende Installationen und bereits aktuelle HostTools bei.
+Run:
 
-Die Checkouts unter `SDK\` und `HostTools\Source\` sind installierte
-Arbeitskopien. Fachliche Aenderungen und Commits erfolgen weiterhin in den
-jeweiligen Quell-Repositories, nicht innerhalb des DevKits.
+    Setup/Setup_Windows.bat
 
-## Lizenz
+The script installs checksum-pinned Zig 0.16.0, Limine 12.0.1, and QEMU
+11.0.0. Portable 7-Zip 26.02 tools are used temporarily to extract QEMU. It
+then installs the matching Contract, SDK, and Distribution checkouts and
+builds the R4OS host tools.
 
-Die originalen DevKit-Skripte stehen unter der Apache License 2.0; siehe
-`LICENSE` und `NOTICE`. Heruntergeladene Werkzeuge wie Zig, Limine und QEMU
-sind nicht Bestandteil dieses Repositorys und behalten ihre eigenen Lizenzen.
+Git, curl, and Windows PowerShell must already be available. All generated
+files remain within the DevKit. Repository updates are fast-forward only and
+locally modified installed checkouts are never overwritten.
+
+The installed checkouts are consumers, not canonical editing locations.
+Changes belong in the corresponding source repository.
+
+## License
+
+Original DevKit scripts are licensed under Apache License 2.0. Downloaded tools
+retain their upstream licenses; see `THIRD_PARTY_NOTICES.md`.
