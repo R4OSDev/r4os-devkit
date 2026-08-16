@@ -42,6 +42,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem R4OS source dependencies are public. Never consult stored GitHub
+rem credentials or prompt for authentication while cloning or updating them.
+set "GIT_ASKPASS="
+set "SSH_ASKPASS="
+set "GIT_TERMINAL_PROMPT=0"
+set "GCM_INTERACTIVE=Never"
+
 set "ZIG_VERSION=0.16.0"
 set "ZIG_URL=https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip"
 set "ZIG_SHA256=68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
@@ -64,8 +71,9 @@ set "SEVENZIP_SHA256=6745fa76dc2ea031596d8678f6f6b99c3c1b435b4164a63485adbbc7b8d
 
 set "CONTRACT_REPOSITORY_URL=https://github.com/R4OSDev/r4os-contract.git"
 set "SDK_REPOSITORY_URL=https://github.com/R4OSDev/r4os-sdk.git"
+set "LIBRARIES_REPOSITORY_URL=https://github.com/R4OSDev/r4os-libraries.git"
 set "DISTRIBUTION_REPOSITORY_URL=https://github.com/R4OSDev/r4os-distribution.git"
-set "HOSTTOOLS_FORMAT=2"
+set "HOSTTOOLS_FORMAT=3"
 
 set "ZIG_TARGET=!DEVKIT_ROOT!\Toolchains\Zig"
 set "LIMINE_TARGET=!DEVKIT_ROOT!\Boot\Limine"
@@ -73,6 +81,7 @@ set "QEMU_TARGET=!DEVKIT_ROOT!\Emulation\QEMU"
 set "CONTRACT_TARGET=!DEVKIT_ROOT!\SDK\Contract"
 set "SDK_TARGET=!DEVKIT_ROOT!\SDK\Core"
 set "HOSTTOOLS_TARGET=!DEVKIT_ROOT!\HostTools"
+set "LIBRARIES_TARGET=!HOSTTOOLS_TARGET!\Source\Libraries"
 set "DISTRIBUTION_TARGET=!HOSTTOOLS_TARGET!\Source\Distribution"
 set "HOSTTOOLS_BIN=!HOSTTOOLS_TARGET!\bin"
 set "HOSTTOOLS_STATE=!HOSTTOOLS_TARGET!\.setup-state"
@@ -122,6 +131,9 @@ if errorlevel 1 goto :failure
 call :sync_repository "!SDK_REPOSITORY_URL!" "!SDK_TARGET!" "SDK"
 if errorlevel 1 goto :failure
 
+call :sync_repository "!LIBRARIES_REPOSITORY_URL!" "!LIBRARIES_TARGET!" "Libraries"
+if errorlevel 1 goto :failure
+
 call :sync_repository "!DISTRIBUTION_REPOSITORY_URL!" "!DISTRIBUTION_TARGET!" "Distribution"
 if errorlevel 1 goto :failure
 
@@ -129,6 +141,9 @@ call :read_commit "!CONTRACT_TARGET!" "CONTRACT_COMMIT" "Contract"
 if errorlevel 1 goto :failure
 
 call :read_commit "!SDK_TARGET!" "SDK_COMMIT" "SDK"
+if errorlevel 1 goto :failure
+
+call :read_commit "!LIBRARIES_TARGET!" "LIBRARIES_COMMIT" "Libraries"
 if errorlevel 1 goto :failure
 
 call :read_commit "!DISTRIBUTION_TARGET!" "DISTRIBUTION_COMMIT" "Distribution"
@@ -377,7 +392,7 @@ if not exist "%~2\.git" (
     )
     set "REPOSITORY_CLONE_TARGET=!TEMP_ROOT!\clone-%~3"
     echo Cloning %~3...
-    git.exe clone --branch main --single-branch "%~1" "!REPOSITORY_CLONE_TARGET!"
+    git.exe -c credential.helper= clone --branch main --single-branch "%~1" "!REPOSITORY_CLONE_TARGET!"
     if errorlevel 1 (
         echo [ERROR] Could not clone %~3.
         exit /b 1
@@ -424,7 +439,7 @@ if /I not "!REPOSITORY_BRANCH!"=="main" (
 )
 
 echo Updating %~3...
-git.exe -C "%~2" pull --ff-only origin main
+git.exe -c credential.helper= -C "%~2" pull --ff-only origin main
 if errorlevel 1 (
     echo [ERROR] Could not update %~3 with a fast-forward pull.
     exit /b 1
@@ -458,12 +473,14 @@ if not exist "!HOSTTOOLS_STATE!" exit /b 0
 set "INSTALLED_FORMAT="
 set "INSTALLED_CONTRACT_COMMIT="
 set "INSTALLED_SDK_COMMIT="
+set "INSTALLED_LIBRARIES_COMMIT="
 set "INSTALLED_DISTRIBUTION_COMMIT="
 set "INSTALLED_ZIG_VERSION="
 for /f "usebackq tokens=1,* delims==" %%A in ("!HOSTTOOLS_STATE!") do (
     if /I "%%A"=="FORMAT" set "INSTALLED_FORMAT=%%B"
     if /I "%%A"=="CONTRACT_COMMIT" set "INSTALLED_CONTRACT_COMMIT=%%B"
     if /I "%%A"=="SDK_COMMIT" set "INSTALLED_SDK_COMMIT=%%B"
+    if /I "%%A"=="LIBRARIES_COMMIT" set "INSTALLED_LIBRARIES_COMMIT=%%B"
     if /I "%%A"=="DISTRIBUTION_COMMIT" set "INSTALLED_DISTRIBUTION_COMMIT=%%B"
     if /I "%%A"=="ZIG_VERSION" set "INSTALLED_ZIG_VERSION=%%B"
 )
@@ -471,6 +488,7 @@ for /f "usebackq tokens=1,* delims==" %%A in ("!HOSTTOOLS_STATE!") do (
 if not "!INSTALLED_FORMAT!"=="!HOSTTOOLS_FORMAT!" exit /b 0
 if /I not "!INSTALLED_CONTRACT_COMMIT!"=="!CONTRACT_COMMIT!" exit /b 0
 if /I not "!INSTALLED_SDK_COMMIT!"=="!SDK_COMMIT!" exit /b 0
+if /I not "!INSTALLED_LIBRARIES_COMMIT!"=="!LIBRARIES_COMMIT!" exit /b 0
 if /I not "!INSTALLED_DISTRIBUTION_COMMIT!"=="!DISTRIBUTION_COMMIT!" exit /b 0
 if not "!INSTALLED_ZIG_VERSION!"=="!ZIG_VERSION!" exit /b 0
 
@@ -511,7 +529,7 @@ if not "!BUILD_EXIT_CODE!"=="0" (
 
 echo Building Distribution HostTools...
 pushd "!DISTRIBUTION_TARGET!" >nul || exit /b 1
-"!ZIG_TARGET!\zig.exe" build --cache-dir "!DISTRIBUTION_BUILD_CACHE!" --global-cache-dir "!ZIG_GLOBAL_CACHE!" --prefix "!DISTRIBUTION_BUILD_PREFIX!" -Doptimize=ReleaseSafe --fork="!SDK_TARGET!" --fork="!CONTRACT_TARGET!"
+"!ZIG_TARGET!\zig.exe" build --cache-dir "!DISTRIBUTION_BUILD_CACHE!" --global-cache-dir "!ZIG_GLOBAL_CACHE!" --prefix "!DISTRIBUTION_BUILD_PREFIX!" -Doptimize=ReleaseSafe --fork="!SDK_TARGET!" --fork="!CONTRACT_TARGET!" --fork="!LIBRARIES_TARGET!"
 set "BUILD_EXIT_CODE=!ERRORLEVEL!"
 popd
 if not "!BUILD_EXIT_CODE!"=="0" (
@@ -553,6 +571,7 @@ set "HOSTTOOLS_STATE_TEMP=!TEMP_ROOT!\hosttools.state"
     echo FORMAT=!HOSTTOOLS_FORMAT!
     echo CONTRACT_COMMIT=!CONTRACT_COMMIT!
     echo SDK_COMMIT=!SDK_COMMIT!
+    echo LIBRARIES_COMMIT=!LIBRARIES_COMMIT!
     echo DISTRIBUTION_COMMIT=!DISTRIBUTION_COMMIT!
     echo ZIG_VERSION=!ZIG_VERSION!
 )

@@ -27,6 +27,10 @@ Git, curl, and Windows PowerShell must already be available. All generated
 files remain within the DevKit. Repository updates are fast-forward only and
 locally modified installed checkouts are never overwritten.
 
+Contract, SDK, Libraries, and Distribution are cloned from their public HTTPS
+repositories. The setup does not load a GitHub API token, disables interactive
+authentication, and ignores local Git credential helpers for these checkouts.
+
 The installed checkouts are consumers, not canonical editing locations.
 Changes belong in the corresponding source repository.
 
