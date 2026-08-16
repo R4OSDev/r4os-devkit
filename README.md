@@ -34,6 +34,10 @@ authentication, and ignores local Git credential helpers for these checkouts.
 The installed checkouts are consumers, not canonical editing locations.
 Changes belong in the corresponding source repository.
 
+The canonical DevKit repository participates in the workspace-wide
+`Tools/Github.bat -push -changed` workflow from the R4OS project root.
+Installed toolchains and source checkouts remain excluded from that push.
+
 ## License
 
 Original DevKit scripts are licensed under Apache License 2.0. Downloaded tools
