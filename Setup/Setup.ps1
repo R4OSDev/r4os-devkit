@@ -157,7 +157,7 @@ function Install-LinuxPrerequisites {
     if ([string]::IsNullOrWhiteSpace($codename)) { throw 'Debian VERSION_CODENAME fehlt in /etc/os-release.' }
 
     $apt = Get-RequiredCommand 'apt-get'
-    $baseMissing = @('curl', 'git', 'tar', 'xz', 'make', 'cc') | Where-Object { $null -eq (Get-Command $_ -ErrorAction SilentlyContinue) }
+    $baseMissing = @(@('curl', 'git', 'tar', 'xz', 'make', 'cc') | Where-Object { $null -eq (Get-Command $_ -ErrorAction SilentlyContinue) })
     $systemQemu = Get-Command 'qemu-system-x86_64' -ErrorAction SilentlyContinue
     $qemuReady = $null -ne $systemQemu -and (Test-Version $systemQemu.Source @('--version') $qemuVersionPrefix)
     if ($baseMissing.Count -eq 0 -and $qemuReady) { Write-Host '[OK] Linux-Systempakete sind bereits vorhanden.'; return }
