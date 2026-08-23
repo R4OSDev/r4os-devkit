@@ -12,19 +12,26 @@ downloaded toolchains or installed source checkouts.
     HostTools/bin/    Built R4OS host tools
     HostTools/Source/ Installed host-tool sources
 
-## Windows setup
+## Setup
 
-Run:
+Windows:
 
     Setup/Setup_Windows.bat
 
-The script installs checksum-pinned Zig 0.16.0, Limine 12.0.1, and QEMU
-11.0.0. Portable 7-Zip 26.02 tools are used temporarily to extract QEMU. It
-then installs the matching Contract, SDK, and Distribution checkouts and
-builds the R4OS host tools.
+Debian Linux:
 
-Git, curl, and Windows PowerShell must already be available. All generated
-files remain within the DevKit. Repository updates are fast-forward only and
+    ./Setup/Setup_Linux.sh
+
+Both launchers call the shared PowerShell 7 setup. It installs
+checksum-pinned Zig 0.16.0 and Limine 12.0.1, prepares QEMU 11.0.x, installs
+the matching Contract, SDK, Libraries, and Distribution checkouts, and builds
+the R4OS host tools. Windows uses the portable QEMU package; Debian uses QEMU
+from its backports repository and places only host-specific links below the
+DevKit.
+
+PowerShell 7 must already be available. Windows also requires Git and curl.
+On Debian the setup installs missing Git, curl, compiler, and QEMU packages
+with root or sudo privileges. Repository updates are fast-forward only and
 locally modified installed checkouts are never overwritten.
 
 Contract, SDK, Libraries, and Distribution are cloned from their public HTTPS
@@ -35,7 +42,8 @@ The installed checkouts are consumers, not canonical editing locations.
 Changes belong in the corresponding source repository.
 
 The canonical DevKit repository participates in the workspace-wide
-`Tools/Github.bat -push -changed` workflow from the R4OS project root.
+`Tools/Github.bat -push -changed` or `./Tools/Github.sh -push -changed`
+workflow from the R4OS project root.
 Installed toolchains and source checkouts remain excluded from that push.
 
 ## License

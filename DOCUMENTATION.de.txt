@@ -13,13 +13,18 @@ installierte Hostwerkzeuge werden lokal bezogen und nicht eingecheckt.
     HostTools\bin\    Gebaute R4OS-Hostwerkzeuge
     HostTools\Source\ Installierte Hosttool-Quellen
 
-Unter Windows richtet `Setup\Setup_Windows.bat` die festgelegten Versionen von
-Zig, Limine und QEMU ein. Danach klont beziehungsweise aktualisiert es die
-oeffentlichen Contract-, SDK- und Distribution-Repositories. Daraus baut es
+Unter Windows startet `Setup\Setup_Windows.bat`, unter Debian Linux
+`./Setup/Setup_Linux.sh` die gemeinsame PowerShell-7-Logik in `Setup.ps1`.
+Sie richtet die festgelegten Versionen von Zig, Limine und QEMU ein. Danach
+klont beziehungsweise aktualisiert sie die oeffentlichen Contract-, SDK-,
+Libraries- und Distribution-Repositories. Daraus baut sie
 ApiContractGen, R4LContractGen, R4XBuilder, ModuleCatalog, ImageCreator,
 NtfsVerify, R4UPack, SerialLinkHost, ImagePlan, PreloadImage und
-DefaultRegistry. Git, curl und Windows PowerShell muessen auf dem Host
-vorhanden sein.
+DefaultRegistry. PowerShell 7 muss auf dem Host vorhanden sein; Windows
+benoetigt ausserdem Git und curl. Unter Debian installiert das Setup fehlende
+Git-, curl-, Compiler- und QEMU-Pakete mit root- oder sudo-Rechten; QEMU wird
+aus Debian-Backports verwendet und ueber hostspezifische Links im DevKit
+bereitgestellt.
 
 Alle Ziel-, Temporaer- und Zig-Cachepfade liegen innerhalb des DevKits.
 Downloads werden per Pruefsumme kontrolliert, Repositoryupdates erfolgen nur
