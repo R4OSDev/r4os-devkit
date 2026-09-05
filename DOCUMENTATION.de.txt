@@ -22,9 +22,11 @@ ApiContractGen, R4LContractGen, R4XBuilder, ModuleCatalog, ImageCreator,
 NtfsVerify, R4UPack, SerialLinkHost, ImagePlan, PreloadImage und
 DefaultRegistry. PowerShell 7 muss auf dem Host vorhanden sein; Windows
 benoetigt ausserdem Git und curl. Unter Debian installiert das Setup fehlende
-Git-, curl-, Compiler- und QEMU-Pakete mit root- oder sudo-Rechten; QEMU wird
+Git-, curl-, Compiler-, QEMU- und OVMF-Pakete mit root- oder sudo-Rechten; QEMU wird
 aus Debian-Backports verwendet und ueber hostspezifische Links im DevKit
-bereitgestellt.
+bereitgestellt. OVMF liefert das zusammengehoerige UEFI-Code-/Variablenpaar
+fuer die Recovery-Bootabnahme. Windows verwendet die Firmware des portablen
+QEMU-Pakets oder ein ausdruecklich gewaehltes passendes Paar.
 
 Alle Ziel-, Temporaer- und Zig-Cachepfade liegen innerhalb des DevKits.
 Downloads werden per Pruefsumme kontrolliert, Repositoryupdates erfolgen nur

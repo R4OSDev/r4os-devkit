@@ -160,11 +160,13 @@ function Install-LinuxPrerequisites {
     $baseMissing = @(@('curl', 'git', 'tar', 'xz', 'make', 'cc') | Where-Object { $null -eq (Get-Command $_ -ErrorAction SilentlyContinue) })
     $systemQemu = Get-Command 'qemu-system-x86_64' -ErrorAction SilentlyContinue
     $qemuReady = $null -ne $systemQemu -and (Test-Version $systemQemu.Source @('--version') $qemuVersionPrefix)
-    if ($baseMissing.Count -eq 0 -and $qemuReady) { Write-Host '[OK] Linux-Systempakete sind bereits vorhanden.'; return }
+    $ovmfReady = (Test-Path -LiteralPath '/usr/share/OVMF/OVMF_CODE_4M.fd' -PathType Leaf) -and
+        (Test-Path -LiteralPath '/usr/share/OVMF/OVMF_VARS_4M.fd' -PathType Leaf)
+    if ($baseMissing.Count -eq 0 -and $qemuReady -and $ovmfReady) { Write-Host '[OK] Linux-Systempakete sind bereits vorhanden.'; return }
 
     Write-Host '=== Debian-Systempakete ==='
     Invoke-AsRoot $apt @('update')
-    Invoke-AsRoot $apt @('install', '-y', 'ca-certificates', 'curl', 'git', 'xz-utils', 'build-essential')
+    Invoke-AsRoot $apt @('install', '-y', 'ca-certificates', 'curl', 'git', 'xz-utils', 'build-essential', 'ovmf')
     if (-not $qemuReady) {
         Invoke-AsRoot $apt @('install', '-y', '-t', ($codename + '-backports'), 'qemu-system-x86', 'qemu-utils')
     }

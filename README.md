@@ -30,9 +30,13 @@ from its backports repository and places only host-specific links below the
 DevKit.
 
 PowerShell 7 must already be available. Windows also requires Git and curl.
-On Debian the setup installs missing Git, curl, compiler, and QEMU packages
+On Debian the setup installs missing Git, curl, compiler, QEMU and OVMF packages
 with root or sudo privileges. Repository updates are fast-forward only and
 locally modified installed checkouts are never overwritten.
+
+OVMF provides the matching UEFI code/variable images for Recovery boot tests.
+Windows uses the firmware bundled with QEMU or an explicitly selected matching
+OVMF code/variable pair.
 
 Contract, SDK, Libraries, and Distribution are cloned from their public HTTPS
 repositories. The setup does not load a GitHub API token, disables interactive
