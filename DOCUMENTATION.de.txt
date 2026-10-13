@@ -8,6 +8,7 @@ installierte Hostwerkzeuge werden lokal bezogen und nicht eingecheckt.
     SDK\Contract\     Passender Plattform-Contract
     Setup\            Plattformspezifische Setup-Skripte
     Toolchains\Zig\   Zig-Toolchain
+    Toolchains\Rust\  Isolierte, festgelegte Rust-/Cargo-Toolchain
     Boot\Limine\      Limine-Bootloader und Hostwerkzeug
     Emulation\QEMU\   QEMU fuer Build- und Systemtests
     HostTools\bin\    Gebaute R4OS-Hostwerkzeuge
@@ -15,7 +16,7 @@ installierte Hostwerkzeuge werden lokal bezogen und nicht eingecheckt.
 
 Unter Windows startet `Setup\Setup_Windows.bat`, unter Debian Linux
 `./Setup/Setup_Linux.sh` die gemeinsame PowerShell-7-Logik in `Setup.ps1`.
-Sie richtet die festgelegten Versionen von Zig, Limine und QEMU ein. Danach
+Sie richtet die festgelegten Versionen von Zig, Rust, Limine und QEMU ein. Danach
 klont beziehungsweise aktualisiert sie die oeffentlichen Contract-, SDK-,
 Libraries- und Distribution-Repositories. Daraus baut sie
 ApiContractGen, R4LContractGen, R4XBuilder, ModuleCatalog, ImageCreator,
@@ -28,7 +29,7 @@ bereitgestellt. OVMF liefert das zusammengehoerige UEFI-Code-/Variablenpaar
 fuer die Recovery-Bootabnahme. Windows verwendet die Firmware des portablen
 QEMU-Pakets oder ein ausdruecklich gewaehltes passendes Paar.
 
-Alle Ziel-, Temporaer- und Zig-Cachepfade liegen innerhalb des DevKits.
+Alle Ziel- und Compiler-Cachepfade liegen innerhalb des DevKits.
 Downloads werden per Pruefsumme kontrolliert, Repositoryupdates erfolgen nur
 als Fast-Forward auf `main`, und lokal veraenderte Installations-Checkouts
 werden nicht ueberschrieben. Ein unveraenderter erneuter Aufruf behaelt
@@ -37,6 +38,35 @@ passende Installationen und bereits aktuelle HostTools bei.
 Die Checkouts unter `SDK\` und `HostTools\Source\` sind installierte
 Arbeitskopien. Fachliche Aenderungen und Commits erfolgen weiterhin in den
 jeweiligen Quell-Repositories, nicht innerhalb des DevKits.
+
+## Rust-Vorbereitung
+
+Nur Rust installieren, vom Workspace-Root:
+    ./DevKit/Setup/Rust.sh setup
+    DevKit\Setup\Rust.bat setup
+
+Setup/RustToolchain.json legt Rust 1.99.0, rustup 1.29.1, Manifest und
+Bootstrap-Pruefsummen fest. Installiert sind rustc, Cargo, rustfmt, Clippy,
+LLVM-Werkzeuge, Rust-Quellen und das Bare-Metal-Target x86_64-unknown-none.
+rust-lld liefert den Kernel-Linker; LLVM-Werkzeuge untersuchen die ELF-Dateien.
+Der bestehende Kernelbau verwendet bis zur Migration weiterhin Zig.
+
+Werkzeuge immer ueber den gemeinsamen PowerShell-Starter aufrufen:
+    ./DevKit/Setup/Rust.sh rustc --version
+    ./DevKit/Setup/Rust.sh cargo build --target x86_64-unknown-none
+    ./DevKit/Setup/Rust.sh cargo fmt -- --check
+    ./DevKit/Setup/Rust.sh cargo clippy --target x86_64-unknown-none
+    ./DevKit/Setup/Rust.sh describe
+Windows: DevKit\Setup\Rust.bat mit denselben Argumenten.
+Cargo im Rust-Projektverzeichnis aufrufen oder --manifest-path <Cargo.toml> mitgeben.
+
+Der Starter setzt eigene Cargo-/rustup-Verzeichnisse und die genaue Version
+nur fuer den Aufruf und stellt danach die Prozessumgebung wieder her.
+Profile und globaler PATH werden nicht veraendert. Installationen bleiben
+unter Toolchains/Rust, Downloads unter .Cache/Rust, jeweils git-ignoriert.
+Native Windows-Hostprogramme brauchen zusaetzlich MSVC-/Windows-SDK-Werkzeuge;
+das Kerneltarget verwendet den mitgelieferten Linker. Ausfuehrung ist auf
+Linux geprueft; ein Windows-Ausfuehrungsnachweis liegt nicht vor.
 
 ## Lizenz
 

@@ -381,7 +381,9 @@ try {
     $curlExecutable = Get-RequiredCommand $(if ($IsWindows) { 'curl.exe' } else { 'curl' }) 'curl'
     $env:GIT_ASKPASS = ''; $env:SSH_ASKPASS = ''; $env:GIT_TERMINAL_PROMPT = '0'; $env:GCM_INTERACTIVE = 'Never'
     [void](New-Item -ItemType Directory -Path $tempRoot)
-    Install-Zig; Install-Limine; Install-Qemu
+    Install-Zig
+    Invoke-External (Get-RequiredCommand 'pwsh') @('-NoLogo', '-NoProfile', '-File', (Join-Path $setupRoot 'Rust.ps1'), 'setup') -FailureMessage 'Rust konnte nicht eingerichtet werden.'
+    Install-Limine; Install-Qemu
     Sync-Repository $contractRepositoryUrl $contractTarget 'Contract'; Sync-Repository $sdkRepositoryUrl $sdkTarget 'SDK'
     Sync-Repository $librariesRepositoryUrl $librariesTarget 'Libraries'; Sync-Repository $distributionRepositoryUrl $distributionTarget 'Distribution'
     $commits = @{ Contract = Get-RepositoryCommit $contractTarget 'Contract'; SDK = Get-RepositoryCommit $sdkTarget 'SDK'; Libraries = Get-RepositoryCommit $librariesTarget 'Libraries'; Distribution = Get-RepositoryCommit $distributionTarget 'Distribution' }

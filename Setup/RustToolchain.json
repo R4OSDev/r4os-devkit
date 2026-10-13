@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "rust_version": "1.99.0",
+  "rustup_version": "1.29.1",
+  "manifest_sha256": "ce6dddc886364f8d786514771212cebe9b731ba82d6b859951c6b0ccc516b6a2",
+  "kernel_target": "x86_64-unknown-none",
+  "components": ["rustfmt", "clippy", "llvm-tools-preview", "rust-src"],
+  "hosts": {
+    "Linux": {
+      "triple": "x86_64-unknown-linux-gnu",
+      "rustup_sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+    },
+    "Windows": {
+      "triple": "x86_64-pc-windows-msvc",
+      "rustup_sha256": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e"
+    }
+  }
+}
