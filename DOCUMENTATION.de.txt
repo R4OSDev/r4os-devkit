@@ -49,7 +49,10 @@ Setup/RustToolchain.json legt Rust 1.99.0, rustup 1.29.1, Manifest und
 Bootstrap-Pruefsummen fest. Installiert sind rustc, Cargo, rustfmt, Clippy,
 LLVM-Werkzeuge, Rust-Quellen und das Bare-Metal-Target x86_64-unknown-none.
 rust-lld liefert den Kernel-Linker; LLVM-Werkzeuge untersuchen die ELF-Dateien.
-Der bestehende Kernelbau verwendet bis zur Migration weiterhin Zig.
+Der produktive Kernel verwendet diese feste Rust-Stable-Toolchain.
+Andere Module und der separate Recovery-Kernel behalten Zig. Fuer den
+Kernelbau Build.sh beziehungsweise Build.bat des Kernel-Repositories nutzen;
+dieser Einstieg erzwingt das gepruefte Profil und den Linkvertrag.
 
 Werkzeuge immer ueber den gemeinsamen PowerShell-Starter aufrufen:
     ./DevKit/Setup/Rust.sh rustc --version

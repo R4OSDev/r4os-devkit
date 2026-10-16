@@ -62,8 +62,10 @@ Install only the Rust toolchain from the workspace root:
 manifest and both bootstrap checksums. The minimal host toolchain includes
 rustc/Cargo and adds rustfmt, Clippy, LLVM tools, Rust sources and the
 `x86_64-unknown-none` target. Its `rust-lld` links the freestanding kernel;
-LLVM readobj/objdump/objcopy/nm/size inspect ELF output. Nightly is not required
-for this preparation. The existing kernel build still uses Zig.
+LLVM readobj/objdump/objcopy/nm/size inspect ELF output. The production kernel
+uses this pinned stable toolchain;
+other modules and the separate Recovery kernel retain Zig. Use the kernel
+Build.sh/Build.bat to enforce its checked profile and link contract.
 
 Use the launcher for each invocation so the isolated Cargo/rustup homes and
 the exact toolchain are selected together, independent of system Rust:
