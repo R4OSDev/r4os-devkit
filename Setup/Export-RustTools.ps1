@@ -33,6 +33,13 @@ function Version([string]$Root){
     if($text -notmatch '\.version\s*=\s*"(\d+\.\d+\.\d+)"'){throw 'Missing package version.'}
     return $Matches[1]
 }
+function Crate([string]$Root,[string]$Relative){
+    $text=[IO.File]::ReadAllText((Join-Path $Root $Relative))
+    $package=[regex]::Match($text,'(?ms)^\[package\]\s*(.*?)(?=^\[|\z)').Groups[1].Value
+    $name=[regex]::Match($package,'(?m)^name\s*=\s*"([^"]+)"').Groups[1].Value
+    $version=[regex]::Match($package,'(?m)^version\s*=\s*"(\d+\.\d+\.\d+)"').Groups[1].Value
+    if(!$name -or !$version){throw 'Missing Rust crate identity.'};return @{name=$name;version=$version}
+}
 function Copy-Input([string]$Source,[string]$Relative){
     $target=Join-Path $Destination $Relative
     [IO.Directory]::CreateDirectory((Split-Path $target -Parent))|Out-Null
@@ -70,6 +77,9 @@ $sdkSource=Source $SdkRoot;$contractSource=Source $ContractRoot;$devKitSource=So
 foreach($file in @('Rust.ps1','Rust.sh','Rust.bat','RustToolchain.json')){Copy-Input (Join-Path $PSScriptRoot $file) ('Setup/'+$file)}
 Copy-Input $ReleaseManifest 'Profile/rust-release.toml'
 Copy-Input (Join-Path $ContractRoot 'Module/CpuBaseline.json') 'Profile/CpuBaseline.json'
+Copy-Input (Join-Path $PSScriptRoot 'ZigToolchain.json') 'Profile/ZigToolchain.json'
+Copy-Input (Join-Path $SdkRoot 'r4os/rust_qualification.json') 'Profile/RustQualification.json'
+Copy-Input (Join-Path $SdkRoot 'r4os/rust_module_profile.json') 'Profile/RustModuleProfile.json'
 $templateSource=Join-Path $SdkRoot 'Templates';$templateDestination=Join-Path $Destination 'Profile/Templates'
 if(Test-Path -LiteralPath $templateDestination){Remove-Item -LiteralPath $templateDestination -Recurse -Force}
 Get-ChildItem -LiteralPath $templateSource -File -Recurse|ForEach-Object {Copy-Input $_.FullName ('Profile/Templates/'+[IO.Path]::GetRelativePath($templateSource,$_.FullName).Replace('\','/'))}
@@ -86,13 +96,13 @@ foreach($name in @('Linux','Windows')){
     $suffix=if($name -eq 'Windows'){'.exe'}else{''}
     $hosts[$name]=[ordered]@{triple=$hostTriple;bootstrap=@{url="https://static.rust-lang.org/rustup/archive/$($pin.rustup_version)/$hostTriple/rustup-init$suffix";sha256=$pin.hosts[$name].rustup_sha256};required=$required;optional=$optional;packager="bin/$hostTriple/r4xbuilder$suffix";catalog="bin/$hostTriple/module-catalog$suffix";packager_build_target=$(if($name -eq 'Windows'){'x86_64-windows-gnu'}else{'x86_64-linux-gnu'})}
 }
-$sdkInputs=@(foreach($relative in @('build.zig.zon','r4os/module_manifest.zig','r4os/module_capabilities.zig','r4os/rust_project.zig','r4os/rust_module_profile.json','r4os/linker/r4os_module.ld','Tools/ModuleCatalog/src/main.zig','Tools/R4XBuilder/src/main.zig','Tools/Build-RustModule.ps1','Tools/New-RustProject.ps1','Rust/Cargo.toml')){@{path=$relative;sha256=Hash (Join-Path $SdkRoot $relative)}}
+$sdkInputs=@(foreach($relative in @('build.zig.zon','r4os/module_manifest.zig','r4os/module_capabilities.zig','r4os/rust_project.zig','r4os/rust_module_profile.json','r4os/rust_qualification.json','r4os/linker/r4os_module.ld','Tools/ModuleCatalog/src/main.zig','Tools/ModuleCatalog/src/capabilities.zig','Tools/R4XBuilder/src/main.zig','Tools/Build-RustModule.ps1','Tools/New-RustProject.ps1','Rust/Cargo.toml')){@{path=$relative;sha256=Hash (Join-Path $SdkRoot $relative)}}
     foreach($directory in @('Rust/src','Templates')){Get-ChildItem -LiteralPath (Join-Path $SdkRoot $directory) -File -Recurse|Sort-Object FullName|ForEach-Object {@{path=[IO.Path]::GetRelativePath($SdkRoot,$_.FullName).Replace('\','/');sha256=Hash $_.FullName}}})
 $contractInputs=@(foreach($relative in @('build.zig.zon','Module/CpuBaseline.json','Generated/SDK/Rust/Cargo.toml','Generated/SDK/Rust/src/lib.rs')){@{path=$relative;sha256=Hash (Join-Path $ContractRoot $relative)}})
 $files=@(foreach($dir in @('Setup','Profile','bin')){Get-ChildItem -LiteralPath (Join-Path $Destination $dir) -File -Recurse|Sort-Object FullName|ForEach-Object {@{path=[IO.Path]::GetRelativePath($Destination,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=Hash $_.FullName}}})
 $exportedRustProfile=[ordered]@{schema=1;id=$pin.profiles.sdk.id;scope='pinned tools, not a Rust module build capability';technical=[bool]$Technical;
-    sdk=@{version=Version $SdkRoot;source=$sdkSource;inputs=$sdkInputs;packager_source_sha256=Hash (Join-Path $SdkRoot 'Tools/R4XBuilder/src/main.zig')};
-    contract=@{version=Version $ContractRoot;source=$contractSource;inputs=$contractInputs;cpu_baseline='Profile/CpuBaseline.json'};
+    sdk=@{version=Version $SdkRoot;source=$sdkSource;inputs=$sdkInputs;rust_crate=Crate $SdkRoot 'Rust/Cargo.toml';packager_source_sha256=Hash (Join-Path $SdkRoot 'Tools/R4XBuilder/src/main.zig')};
+    contract=@{version=Version $ContractRoot;source=$contractSource;inputs=$contractInputs;binding_crate=Crate $ContractRoot 'Generated/SDK/Rust/Cargo.toml';cpu_baseline='Profile/CpuBaseline.json'};
     devkit=$devKitSource;rust_version=$pin.rust_version;cargo_version=$pin.cargo_version;rustup_version=$pin.rustup_version;
     release_manifest=@{path='Profile/rust-release.toml';url="https://static.rust-lang.org/dist/channel-rust-$($pin.rust_version).toml";sha256=$pin.manifest_sha256};
     bare_target=$pin.kernel_target;hosts=$hosts;template_root='Profile/Templates';required_components=$pin.profiles.sdk.required_components;optional_components=$pin.profiles.sdk.optional_components;rust_src_required=$false;files=$files}

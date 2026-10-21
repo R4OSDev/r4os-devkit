@@ -58,6 +58,9 @@ Install only the Rust toolchain from the workspace root:
     ./DevKit/Setup/Rust.sh setup
     DevKit\Setup\Rust.bat setup
 
+`Setup/ZigToolchain.json` is the shared Zig version/URL/hash source read by
+setup and exported SDK capability metadata. No compiler version changed.
+
 `Setup/RustToolchain.json` pins Rust 1.99.0 and rustup 1.29.1, the release
 manifest and both bootstrap checksums. The minimal host toolchain includes
 rustc/Cargo and adds rustfmt, Clippy, LLVM tools, Rust sources and the

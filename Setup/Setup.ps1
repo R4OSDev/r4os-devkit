@@ -9,7 +9,8 @@ $devKitRoot = [IO.Path]::GetFullPath((Join-Path $setupRoot '..'))
 $hostId = if ($IsWindows) { 'Windows' } elseif ($IsLinux) { 'Linux' } else { 'Unsupported' }
 $executableSuffix = if ($IsWindows) { '.exe' } else { '' }
 
-$zigVersion = '0.16.0'
+$zigPin=Get-Content -Raw -LiteralPath (Join-Path $setupRoot 'ZigToolchain.json')|ConvertFrom-Json -AsHashtable
+$zigVersion = $zigPin.version
 $limineVersion = '12.0.1'
 $qemuVersionPrefix = if ($IsWindows) { 'QEMU emulator version 11.0.0' } else { 'QEMU emulator version 11.0' }
 $hostToolsFormat = '4'
@@ -201,15 +202,15 @@ function Install-Zig {
     Assert-EmptyDirectory $zigTarget 'Zig'
     Write-Host ('=== Zig ' + $zigVersion + ' ===')
     if ($IsWindows) {
-        $url = 'https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip'
-        $hash = '68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e'
+        $url = $zigPin.hosts.Windows.url
+        $hash = $zigPin.hosts.Windows.sha256
         $archive = Join-Path $tempRoot 'zig.zip'; $extract = Join-Path $tempRoot 'Zig'
         Download-File $url $archive 'Zig'; Assert-Hash $archive SHA256 $hash 'Zig'; Expand-Zip $archive $extract
         $source = Join-Path $extract ('zig-x86_64-windows-' + $zigVersion)
     }
     else {
-        $url = 'https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz'
-        $hash = '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00'
+        $url = $zigPin.hosts.Linux.url
+        $hash = $zigPin.hosts.Linux.sha256
         $archive = Join-Path $tempRoot 'zig.tar.xz'; $extract = Join-Path $tempRoot 'Zig'
         [void](New-Item -ItemType Directory -Path $extract)
         Download-File $url $archive 'Zig'; Assert-Hash $archive SHA256 $hash 'Zig'
