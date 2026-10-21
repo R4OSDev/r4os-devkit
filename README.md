@@ -111,7 +111,9 @@ Rust release component URLs/hashes, CPU baseline, both packagers and both Module
 versioned `RustToolsProfile.json` records source commits, SDK/Contract versions,
 required versus optional components and every input file hash. From0.86.36 it
 also binds the selected SDK builder/runtime/profile and Contract binding inputs;
-the SDK driver rejects a mismatched source package. `-Technical`
+the SDK driver rejects a mismatched source package. Exported Profile/Templates
+are copied from canonical SDK templates and included in file hashes; this is
+no independently maintained template set. `-Technical`
 marks development exports with potentially dirty sources; it is not a release.
 
 Run the exported `Setup/Rust.sh` or `Setup\Rust.bat` without the rest of DevKit.
