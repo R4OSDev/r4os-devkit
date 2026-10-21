@@ -91,6 +91,10 @@ has been exercised on Linux; Windows execution is not claimed.
 
 ## Independent SDK Rust tools
 
+Release exports hash/copy canonical files from the pinned Git revisions,
+matching source archives independently of checkout CRLF/LF filters. Technical
+exports use the current working files and remain explicitly marked technical.
+
 `Setup/RustToolchain.json` also defines `r4os-rust-tools-v1`. Select the minimal
 SDK tool profile without changing any version pins:
 
