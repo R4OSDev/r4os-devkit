@@ -102,14 +102,16 @@ DevKit profile and its extra components remain available.
 
 The producer exports a separately usable toolset from clean source repositories:
 
-    pwsh -File Setup/Export-RustTools.ps1 -Destination /absolute/toolset -PackagerLinux /path/r4xbuilder -PackagerWindows /path/r4xbuilder.exe
+    pwsh -File Setup/Export-RustTools.ps1 -Destination /absolute/toolset -PackagerLinux /path/r4xbuilder -PackagerWindows /path/r4xbuilder.exe -CatalogLinux /path/module-catalog -CatalogWindows /path/module-catalog.exe
 
 The SDK packagers are built by the publisher with pinned Zig; users receive
 ELF64/PE32+ x86_64 executables and do not need Zig for these tools. The exporter
 copies this same installer and thin launchers, the single toolchain pin, exact
-Rust release component URLs/hashes, CPU baseline and both packagers. The
+Rust release component URLs/hashes, CPU baseline, both packagers and both ModuleCatalog executables. The
 versioned `RustToolsProfile.json` records source commits, SDK/Contract versions,
-required versus optional components and every input file hash. `-Technical`
+required versus optional components and every input file hash. From0.86.36 it
+also binds the selected SDK builder/runtime/profile and Contract binding inputs;
+the SDK driver rejects a mismatched source package. `-Technical`
 marks development exports with potentially dirty sources; it is not a release.
 
 Run the exported `Setup/Rust.sh` or `Setup\Rust.bat` without the rest of DevKit.
