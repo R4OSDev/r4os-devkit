@@ -1,10 +1,19 @@
 {
   "format": 1,
   "rust_version": "1.99.0",
+  "cargo_version": "1.99.0",
   "rustup_version": "1.29.1",
   "manifest_sha256": "ce6dddc886364f8d786514771212cebe9b731ba82d6b859951c6b0ccc516b6a2",
   "kernel_target": "x86_64-unknown-none",
   "components": ["rustfmt", "clippy", "llvm-tools-preview", "rust-src"],
+  "profiles": {
+    "sdk": {
+      "id": "r4os-rust-tools-v1",
+      "required_components": ["llvm-tools-preview"],
+      "optional_components": ["rustfmt", "clippy"],
+      "rust_src_required": false
+    }
+  },
   "hosts": {
     "Linux": {
       "triple": "x86_64-unknown-linux-gnu",

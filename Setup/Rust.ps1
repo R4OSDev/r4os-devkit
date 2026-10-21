@@ -6,6 +6,30 @@ $Arguments = @($args)
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = 'Stop'
 $devKitRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$toolsetSourceRoot = $devKitRoot
+$explicitCacheRoot = ''
+$profilePath = Join-Path $toolsetSourceRoot 'RustToolsProfile.json'
+$rustProfile = if (Test-Path -LiteralPath $profilePath -PathType Leaf) { 'sdk' } else { 'devkit' }
+$developmentTools = $false
+# Parse only the leading toolset options. Native Cargo/rustc switches and
+# their literal -- remain unbound, preserving the existing DevKit interface.
+while ($Arguments.Count -gt 0) {
+    $option = $Arguments[0]
+    if ($option -eq '--development-tools') {
+        $developmentTools = $true
+        $Arguments = @($Arguments | Select-Object -Skip 1)
+        continue
+    }
+    if ($option -notin @('--root', '--cache-root', '--profile')) { break }
+    if ($Arguments.Count -lt 2 -or !$Arguments[1]) { throw "Missing value for $option" }
+    switch ($option) {
+        '--root' { $devKitRoot = [IO.Path]::GetFullPath($Arguments[1], $toolsetSourceRoot) }
+        '--cache-root' { $explicitCacheRoot = [IO.Path]::GetFullPath($Arguments[1], $toolsetSourceRoot) }
+        '--profile' { $rustProfile = $Arguments[1] }
+    }
+    $Arguments = @($Arguments | Select-Object -Skip 2)
+}
+if ($rustProfile -notin @('devkit', 'sdk')) { throw 'Unknown Rust toolset profile.' }
 $pin = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RustToolchain.json') -Raw | ConvertFrom-Json -AsHashtable
 if ($pin.format -ne 1) { throw 'Unbekanntes Rust-Toolchainformat.' }
 if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [Runtime.InteropServices.Architecture]::X64) {
@@ -22,6 +46,12 @@ $cargoBin = Join-Path $cargoHome 'bin'
 $rustupExe = Join-Path $cargoBin ('rustup' + $suffix)
 $toolchainRoot = Join-Path $rustupHome ('toolchains/' + $toolchainName)
 $llvmBin = Join-Path $toolchainRoot ('lib/rustlib/' + $hostTriple + '/bin')
+$requiredComponents = if ($rustProfile -eq 'sdk') { @($pin.profiles.sdk.required_components) } else { @($pin.components) }
+$wantedComponents = @($requiredComponents)
+if ($rustProfile -eq 'sdk' -and $developmentTools) { $wantedComponents += @($pin.profiles.sdk.optional_components) }
+$cacheRoot = if ($explicitCacheRoot) { $explicitCacheRoot } else { Join-Path $devKitRoot '.Cache/Rust' }
+$script:RustReadinessReason = ''
+$toolsetProfile = if (Test-Path -LiteralPath $profilePath -PathType Leaf) { Get-Content -Raw -LiteralPath $profilePath | ConvertFrom-Json -AsHashtable } else { $null }
 $tool = if ($Arguments.Count -eq 0) { 'describe' } else { $Arguments[0] }
 $toolArgs = @()
 if ($Arguments.Count -gt 1) { $toolArgs = @($Arguments[1..($Arguments.Count - 1)]) }
@@ -42,22 +72,48 @@ function Get-RustOutput([string]$Executable, [string[]]$NativeArguments) {
     return $result
 }
 
+function Get-RustProfilePath([string]$Relative) {
+    if ([IO.Path]::IsPathRooted($Relative) -or $Relative.Contains('\') -or $Relative.Split('/') -contains '..') { throw 'Noncanonical toolset file path.' }
+    return Join-Path $toolsetSourceRoot $Relative
+}
+
+function Test-RustProfileInputs {
+    if ($null -eq $toolsetProfile) { return $true }
+    if ($toolsetProfile.schema -ne 1 -or $toolsetProfile.id -cne $pin.profiles.sdk.id) {
+        $script:RustReadinessReason = 'unsupported standalone toolset metadata'; return $false
+    }
+    foreach ($file in $toolsetProfile.files) {
+        $path = Get-RustProfilePath $file.path
+        if (!(Test-Path -LiteralPath $path -PathType Leaf)) { $script:RustReadinessReason = 'missing toolset input: ' + $file.path; return $false }
+        if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $file.sha256) {
+            $script:RustReadinessReason = 'toolset input hash mismatch: ' + $file.path; return $false
+        }
+    }
+    return $true
+}
+
 function Test-RustReady {
-    if (-not (Test-Path -LiteralPath $rustupExe -PathType Leaf)) { return $false }
+    $script:RustReadinessReason = ''
+    if (!(Test-RustProfileInputs)) { return $false }
+    if (-not (Test-Path -LiteralPath $rustupExe -PathType Leaf)) { $script:RustReadinessReason = 'missing rustup'; return $false }
     $rustcExe = Join-Path $toolchainRoot ('bin/rustc' + $suffix)
-    if (-not (Test-Path -LiteralPath $rustcExe -PathType Leaf)) { return $false }
+    if (-not (Test-Path -LiteralPath $rustcExe -PathType Leaf)) { $script:RustReadinessReason = 'missing rustc'; return $false }
     $rustupVersion = (Get-RustOutput $rustupExe @('--version')) -join ' '
     $rustcVersion = (Get-RustOutput $rustcExe @('--version')) -join ' '
     if (-not $rustupVersion.StartsWith('rustup ' + $pin.rustup_version + ' ') -or
-        -not $rustcVersion.StartsWith('rustc ' + $pin.rust_version + ' ')) { return $false }
+        -not $rustcVersion.StartsWith('rustc ' + $pin.rust_version + ' ')) { $script:RustReadinessReason = 'rustup/rustc version mismatch'; return $false }
+    $cargoExe = Join-Path $toolchainRoot ('bin/cargo' + $suffix)
+    if (!(Test-Path -LiteralPath $cargoExe -PathType Leaf)) { $script:RustReadinessReason = 'missing cargo'; return $false }
+    $cargoVersion = (Get-RustOutput $cargoExe @('--version')) -join ' '
+    if (!$cargoVersion.StartsWith('cargo ' + $pin.cargo_version + ' ')) { $script:RustReadinessReason = 'cargo version mismatch'; return $false }
     $components = @(Get-RustOutput $rustupExe @('component', 'list', '--toolchain', $toolchainName, '--installed'))
-    foreach ($component in $pin.components) {
+    foreach ($component in $wantedComponents) {
         $installedName = if ($component -eq 'rust-src') { 'rust-src' } else { $component.Replace('-preview', '') + '-' + $hostTriple }
-        if ($installedName -notin $components) { return $false }
+        if ($installedName -notin $components) { $script:RustReadinessReason = 'missing component: ' + $installedName; return $false }
     }
-    if (('rust-std-' + $pin.kernel_target) -notin $components) { return $false }
+    if (('rust-std-' + $pin.kernel_target) -notin $components) { $script:RustReadinessReason = 'missing bare target: ' + $pin.kernel_target; return $false }
     foreach ($name in @('rust-lld', 'llvm-readobj', 'llvm-objdump', 'llvm-objcopy', 'llvm-nm', 'llvm-size')) {
-        if (-not (Test-Path -LiteralPath (Join-Path $llvmBin ($name + $suffix)) -PathType Leaf)) { return $false }
+        if (-not (Test-Path -LiteralPath (Join-Path $llvmBin ($name + $suffix)) -PathType Leaf)) { $script:RustReadinessReason = 'missing LLVM tool: ' + $name; return $false }
     }
     return $true
 }
@@ -66,7 +122,7 @@ function Get-RustDownload([string]$Url, [string]$Destination, [string]$ExpectedH
     if (Test-Path -LiteralPath $Destination -PathType Leaf) {
         if ((Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash -ieq $ExpectedHash) { return }
     }
-    $curl = Get-Command $(if ($IsWindows) { 'curl.exe' } else { 'curl' }) -ErrorAction Stop
+    $curl = Get-Command $(if ($IsWindows) { 'curl.exe' } else { 'curl' }) -CommandType Application -ErrorAction Stop | Select-Object -First 1
     Write-Host ('Lade ' + [IO.Path]::GetFileName($Destination) + ' ...')
     Invoke-RustNative $curl.Source @('--fail', '--location', '--proto', '=https', '--tlsv1.2', '--retry', '3',
         '--connect-timeout', '30', '--max-time', '300', '--silent', '--show-error', '--output', $Destination, $Url)
@@ -76,8 +132,8 @@ function Get-RustDownload([string]$Url, [string]$Destination, [string]$ExpectedH
 }
 
 function Install-Rust {
+    if (!(Test-RustProfileInputs)) { throw $script:RustReadinessReason }
     if (Test-RustReady) { Write-Host ('[OK] Rust ' + $pin.rust_version + ', Komponenten und Kerneltarget sind bereits installiert.'); return }
-    $cacheRoot = Join-Path $devKitRoot '.Cache/Rust'
     [void](New-Item -ItemType Directory -Path $cacheRoot -Force)
     $manifest = Join-Path $cacheRoot ('channel-rust-' + $pin.rust_version + '.toml')
     Get-RustDownload ('https://static.rust-lang.org/dist/channel-rust-' + $pin.rust_version + '.toml') $manifest $pin.manifest_sha256
@@ -88,13 +144,17 @@ function Install-Rust {
     Invoke-RustNative $bootstrap @('-y', '--no-modify-path', '--profile', 'minimal', '--default-host', $hostTriple, '--default-toolchain', 'none')
     Invoke-RustNative $rustupExe @('set', 'auto-self-update', 'disable')
     $installArgs = @('toolchain', 'install', $toolchainName, '--profile', 'minimal', '--target', $pin.kernel_target)
-    foreach ($component in $pin.components) { $installArgs += @('--component', $component) }
+    foreach ($component in $wantedComponents) { $installArgs += @('--component', $component) }
     Invoke-RustNative $rustupExe $installArgs
     Invoke-RustNative $rustupExe @('default', $toolchainName)
+    if ($IsLinux -and $null -ne $toolsetProfile) {
+        Invoke-RustNative (Get-Command chmod -CommandType Application | Select-Object -First 1).Source @('755', (Get-RustProfilePath $toolsetProfile.hosts.Linux.packager))
+    }
     if (-not (Test-RustReady)) { throw 'Rust-Installation ist nicht vollstaendig oder hat eine unerwartete Version.' }
     [ordered]@{
         format = 1; host = $hostTriple; rust_version = $pin.rust_version; rustup_version = $pin.rustup_version
-        kernel_target = $pin.kernel_target; components = $pin.components; manifest_sha256 = $pin.manifest_sha256
+        cargo_version = $pin.cargo_version; profile = $rustProfile
+        kernel_target = $pin.kernel_target; components = $wantedComponents; manifest_sha256 = $pin.manifest_sha256
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $rustRoot 'installation.json') -Encoding utf8NoBOM
     Write-Host ('[OK] Rust ' + $pin.rust_version + ' installiert: ' + $rustRoot)
 }
@@ -112,12 +172,27 @@ try {
         if ($toolArgs.Count -ne 0) { throw 'Rust setup akzeptiert keine weiteren Argumente.' }
         Install-Rust
     }
-    elseif ($tool -eq 'describe') {
+    elseif ($tool -in @('describe', 'check')) {
+        $ready = Test-RustReady
         [ordered]@{
-            rust_version = $pin.rust_version; rustup_version = $pin.rustup_version; host = $hostTriple
+            rust_version = $pin.rust_version; cargo_version = $pin.cargo_version; rustup_version = $pin.rustup_version; host = $hostTriple
             kernel_target = $pin.kernel_target; root = $rustRoot; cargo_home = $cargoHome; rustup_home = $rustupHome
-            toolchain = $toolchainRoot; llvm_bin = $llvmBin; installed = (Test-RustReady)
-        } | ConvertTo-Json
+            toolchain = $toolchainRoot; llvm_bin = $llvmBin; installed = $ready; reason = $script:RustReadinessReason
+            profile = $rustProfile; cache_root = $cacheRoot; required_components = @($requiredComponents)
+            optional_components = @(if ($rustProfile -eq 'sdk') { $pin.profiles.sdk.optional_components })
+            wanted_components = @($wantedComponents); rust_src_required = ('rust-src' -in $requiredComponents)
+            pin_sha256 = (Get-FileHash (Join-Path $PSScriptRoot 'RustToolchain.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+            complete_toolset = ($ready -and $null -ne $toolsetProfile)
+            toolset_metadata_present = ($null -ne $toolsetProfile)
+            toolset_manifest_sha256 = $(if ($null -ne $toolsetProfile) { (Get-FileHash $profilePath -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null })
+            sdk = $(if ($null -ne $toolsetProfile) { $toolsetProfile.sdk } else { $null })
+            contract = $(if ($null -ne $toolsetProfile) { $toolsetProfile.contract } else { $null })
+            packager = $(if ($null -ne $toolsetProfile) { Get-RustProfilePath $toolsetProfile.hosts[$hostName].packager } else { $null })
+            linker = Join-Path $llvmBin ('rust-lld' + $suffix)
+            linker_sha256 = $(if ($ready) { (Get-FileHash (Join-Path $llvmBin ('rust-lld' + $suffix)) -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null })
+            installed_components = @(if ($ready) { Get-RustOutput $rustupExe @('component','list','--toolchain',$toolchainName,'--installed') })
+        } | ConvertTo-Json -Depth 8
+        if ($tool -eq 'check' -and !$ready) { $exitCode = 1 }
     }
     else {
         if ($tool -in @('rustc', 'cargo', 'rustup', 'rustfmt', 'cargo-clippy', 'clippy-driver')) {

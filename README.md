@@ -86,6 +86,50 @@ Native Windows host programs additionally require the MSVC/Windows SDK
 prerequisites; the freestanding target uses the bundled linker. This setup
 has been exercised on Linux; Windows execution is not claimed.
 
+## Independent SDK Rust tools
+
+`Setup/RustToolchain.json` also defines `r4os-rust-tools-v1`. Select the minimal
+SDK tool profile without changing any version pins:
+
+    ./Setup/Rust.sh --profile sdk --root /absolute/install --cache-root /absolute/cache setup
+    ./Setup/Rust.sh --profile sdk --root /absolute/install check
+
+Put the options before the command. Paths containing spaces are supported;
+relative roots resolve from the toolset directory. The SDK profile requires
+LLVM tools and the bare target, together with rustc/Cargo. `rust-src` is not
+needed. `--development-tools` adds optional rustfmt/Clippy. The legacy default
+DevKit profile and its extra components remain available.
+
+The producer exports a separately usable toolset from clean source repositories:
+
+    pwsh -File Setup/Export-RustTools.ps1 -Destination /absolute/toolset -PackagerLinux /path/r4xbuilder -PackagerWindows /path/r4xbuilder.exe
+
+The SDK packagers are built by the publisher with pinned Zig; users receive
+ELF64/PE32+ x86_64 executables and do not need Zig for these tools. The exporter
+copies this same installer and thin launchers, the single toolchain pin, exact
+Rust release component URLs/hashes, CPU baseline and both packagers. The
+versioned `RustToolsProfile.json` records source commits, SDK/Contract versions,
+required versus optional components and every input file hash. `-Technical`
+marks development exports with potentially dirty sources; it is not a release.
+
+Run the exported `Setup/Rust.sh` or `Setup\Rust.bat` without the rest of DevKit.
+`describe` emits JSON; `check` emits the same JSON and exits nonzero for missing,
+wrong or partial tools. Output includes actual Cargo version, installed
+components, profile/pin hashes and the selected linker's SHA256. A complete
+export and installed compiler are separate facts (`toolset_metadata_present`
+and `complete_toolset`). The raw tool runner is not the module build driver:
+Cargo.lock, offline dependencies and rejection of project/global profile or
+flag overrides are specified in Contract/Module/RustModuleV1.txt and enforced
+by the matched SDK module builder.
+
+Linux qualification in 0.86.34 used an empty installation root with spaces and
+an independent cache: five required components installed; no optional tools,
+Rust sources, complete DevKit or global Rust configuration were needed.
+Missing rustup, a missing exported packager and a corrupted exported packager
+were rejected. The Windows packager was cross-built and its PE header checked;
+Windows execution remains unqualified. This is host tool work without normal
+R4OS runtime effect and requires no STANDARD benchmark.
+
 ## License
 
 Original DevKit scripts are licensed under Apache License 2.0. Downloaded tools
