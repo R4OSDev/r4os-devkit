@@ -25,11 +25,12 @@ $canonicalCommits=@{}
 function Hash([string]$Path){(Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()}
 function Source-Bytes([string]$Root,[string]$Relative){
     if($Technical){return ,([IO.File]::ReadAllBytes((Join-Path $Root $Relative)))}
-    # Release archives contain Git blobs, not checkout-specific CRLF filters.
+    # Match git archive, including the repository's declared EOL filters.
+    # Edited checkout files can still use different, Git-equivalent newlines.
     $info=[Diagnostics.ProcessStartInfo]::new();$info.FileName='git';$info.UseShellExecute=$false
     $info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
     if(!$canonicalCommits.ContainsKey($Root)){throw 'Source revision was not pinned.'}
-    foreach($arg in @('-C',$Root,'show',($canonicalCommits[$Root]+':'+$Relative))){$info.ArgumentList.Add($arg)}
+    foreach($arg in @('-C',$Root,'cat-file','--filters',($canonicalCommits[$Root]+':'+$Relative))){$info.ArgumentList.Add($arg)}
     $process=[Diagnostics.Process]::new();$process.StartInfo=$info;$bytes=[IO.MemoryStream]::new()
     try{
         if(!$process.Start()){throw 'Cannot read canonical source input.'}
