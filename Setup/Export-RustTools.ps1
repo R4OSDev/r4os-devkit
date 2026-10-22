@@ -8,6 +8,7 @@ param(
     [Parameter(Mandatory)][string]$FacadeRuntime,
     [Parameter(Mandatory)][string]$StorageRuntime,
     [string]$SdkRoot='', [string]$ContractRoot='', [string]$ReleaseManifest='',
+    [string]$LibraryContractLinux='', [string]$LibraryContractWindows='',
     [switch]$Technical
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
@@ -131,6 +132,13 @@ Copy-Input $CatalogWindows 'bin/x86_64-pc-windows-msvc/module-catalog.exe'
 Copy-Input $HeapRuntime 'Runtime/r4sdk_heap.o'
 Copy-Input $FacadeRuntime 'Runtime/r4sdk_facades.o'
 Copy-Input $StorageRuntime 'Runtime/r4sdk_storage.o'
+if([bool]$LibraryContractLinux -ne [bool]$LibraryContractWindows){throw 'Both library-contract host tools must be supplied together.'}
+if($LibraryContractLinux){
+    $LibraryContractLinux=[IO.Path]::GetFullPath($LibraryContractLinux,$workspace)
+    $LibraryContractWindows=[IO.Path]::GetFullPath($LibraryContractWindows,$workspace)
+    Copy-Input $LibraryContractLinux 'bin/x86_64-unknown-linux-gnu/r4l-contract-gen'
+    Copy-Input $LibraryContractWindows 'bin/x86_64-pc-windows-msvc/r4l-contract-gen.exe'
+}
 if($IsLinux){& chmod 755 (Join-Path $Destination 'Setup/Rust.sh') (Join-Path $Destination 'bin/x86_64-unknown-linux-gnu/r4xbuilder');if($LASTEXITCODE -ne 0){throw 'Cannot prepare executable toolset files.'}}
 $hosts=[ordered]@{}
 foreach($name in @('Linux','Windows')){
@@ -139,9 +147,10 @@ foreach($name in @('Linux','Windows')){
     $optional=@(Component 'rustfmt-preview' $hostTriple;Component 'clippy-preview' $hostTriple)
     $suffix=if($name -eq 'Windows'){'.exe'}else{''}
     $hosts[$name]=[ordered]@{triple=$hostTriple;bootstrap=@{url="https://static.rust-lang.org/rustup/archive/$($pin.rustup_version)/$hostTriple/rustup-init$suffix";sha256=$pin.hosts[$name].rustup_sha256};required=$required;optional=$optional;packager="bin/$hostTriple/r4xbuilder$suffix";catalog="bin/$hostTriple/module-catalog$suffix";packager_build_target=$(if($name -eq 'Windows'){'x86_64-windows-gnu'}else{'x86_64-linux-gnu'})}
+    if($LibraryContractLinux){$hosts[$name]['r4l_contract_generator']="bin/$hostTriple/r4l-contract-gen$suffix"}
 }
 $sdkInputs=@(foreach($relative in @('build.zig.zon','r4os/module_manifest.zig','r4os/import_spec.zig','r4os/startup_metadata.zig','r4os/module_capabilities.zig','r4os/rust_project.zig','r4os/rust_module_profile.json','r4os/rust_qualification.json','r4os/linker/r4os_module.ld','r4os/heap_runtime.zig','r4os/vm_allocator.zig','r4os/allocator_wait.zig','r4os/build.zig','Tools/ModuleCatalog/src/main.zig','Tools/ModuleCatalog/src/capabilities.zig','Tools/R4XBuilder/src/main.zig','Tools/Build-RustModule.ps1','Tools/RustBuildInputs.ps1','Tools/New-RustProject.ps1','Rust/Cargo.toml')){@{path=$relative;sha256=Source-Hash $SdkRoot $relative}}
-    foreach($directory in @('Rust/src','Templates','Shared/C','Shared/Generated/R4STD_Grapheme','r4os','Tools/CFacadeGen','Tools/NetBridgeGen','Tools/GuiBridgeGen','Tools/DataBridgeGen')){foreach($relative in Source-Files $SdkRoot $directory){@{path=$relative;sha256=Source-Hash $SdkRoot $relative}}})
+    foreach($directory in @('Rust/src','Templates','Shared/C','Shared/Generated/R4STD_Grapheme','r4os','Tools/CFacadeGen','Tools/NetBridgeGen','Tools/GuiBridgeGen','Tools/DataBridgeGen','Tools/R4LContractGen','Tools/ModuleCatalog')){foreach($relative in Source-Files $SdkRoot $directory){@{path=$relative;sha256=Source-Hash $SdkRoot $relative}}})
 $contractInputs=@(foreach($relative in @('build.zig.zon','Module/CpuBaseline.json','Generated/SDK/Rust/Cargo.toml','Generated/SDK/Rust/src/lib.rs')){@{path=$relative;sha256=Source-Hash $ContractRoot $relative}}
     foreach($directory in @('Generated/SDK/C','Generated/SDK/Zig')){foreach($relative in Source-Files $ContractRoot $directory){@{path=$relative;sha256=Source-Hash $ContractRoot $relative}}})
 $files=@(foreach($dir in @('Setup','Profile','bin','Runtime')){Get-ChildItem -LiteralPath (Join-Path $Destination $dir) -File -Recurse|Sort-Object FullName|ForEach-Object {@{path=[IO.Path]::GetRelativePath($Destination,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=Hash $_.FullName}}})
