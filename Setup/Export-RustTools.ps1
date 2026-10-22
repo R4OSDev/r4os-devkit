@@ -5,6 +5,8 @@ param(
     [Parameter(Mandatory)][string]$CatalogLinux,
     [Parameter(Mandatory)][string]$CatalogWindows,
     [Parameter(Mandatory)][string]$HeapRuntime,
+    [Parameter(Mandatory)][string]$FacadeRuntime,
+    [Parameter(Mandatory)][string]$StorageRuntime,
     [string]$SdkRoot='', [string]$ContractRoot='', [string]$ReleaseManifest='',
     [switch]$Technical
 )
@@ -18,6 +20,8 @@ $SdkRoot=[IO.Path]::GetFullPath($SdkRoot,$workspace);$ContractRoot=[IO.Path]::Ge
 $PackagerLinux=[IO.Path]::GetFullPath($PackagerLinux,$workspace);$PackagerWindows=[IO.Path]::GetFullPath($PackagerWindows,$workspace)
 $CatalogLinux=[IO.Path]::GetFullPath($CatalogLinux,$workspace);$CatalogWindows=[IO.Path]::GetFullPath($CatalogWindows,$workspace)
 $HeapRuntime=[IO.Path]::GetFullPath($HeapRuntime,$workspace)
+$FacadeRuntime=[IO.Path]::GetFullPath($FacadeRuntime,$workspace)
+$StorageRuntime=[IO.Path]::GetFullPath($StorageRuntime,$workspace)
 $pinPath=Join-Path $PSScriptRoot 'RustToolchain.json'
 $pin=Get-Content -Raw -LiteralPath $pinPath|ConvertFrom-Json -AsHashtable
 if(!$ReleaseManifest){$ReleaseManifest=Join-Path $devKit ('.Cache/Rust/channel-rust-'+$pin.rust_version+'.toml')}
@@ -104,8 +108,10 @@ Check-Packager $PackagerLinux $false
 Check-Packager $PackagerWindows $true
 Check-Packager $CatalogLinux $false
 Check-Packager $CatalogWindows $true
-Check-Packager $HeapRuntime $false
-if([BitConverter]::ToUInt16([IO.File]::ReadAllBytes($HeapRuntime),16) -ne 1){throw 'Heap runtime must be an ELF64 relocatable module object.'}
+foreach($runtimeObject in @($HeapRuntime,$FacadeRuntime,$StorageRuntime)){
+    Check-Packager $runtimeObject $false
+    if([BitConverter]::ToUInt16([IO.File]::ReadAllBytes($runtimeObject),16) -ne 1){throw 'SDK runtime must be an ELF64 relocatable module object.'}
+}
 $sdkSource=Source $SdkRoot;$contractSource=Source $ContractRoot;$devKitSource=Source $devKit
 $canonicalCommits[$SdkRoot]=$sdkSource.commit;$canonicalCommits[$ContractRoot]=$contractSource.commit;$canonicalCommits[$devKit]=$devKitSource.commit
 [IO.Directory]::CreateDirectory($Destination)|Out-Null
@@ -123,6 +129,8 @@ Copy-Input $PackagerWindows 'bin/x86_64-pc-windows-msvc/r4xbuilder.exe'
 Copy-Input $CatalogLinux 'bin/x86_64-unknown-linux-gnu/module-catalog'
 Copy-Input $CatalogWindows 'bin/x86_64-pc-windows-msvc/module-catalog.exe'
 Copy-Input $HeapRuntime 'Runtime/r4sdk_heap.o'
+Copy-Input $FacadeRuntime 'Runtime/r4sdk_facades.o'
+Copy-Input $StorageRuntime 'Runtime/r4sdk_storage.o'
 if($IsLinux){& chmod 755 (Join-Path $Destination 'Setup/Rust.sh') (Join-Path $Destination 'bin/x86_64-unknown-linux-gnu/r4xbuilder');if($LASTEXITCODE -ne 0){throw 'Cannot prepare executable toolset files.'}}
 $hosts=[ordered]@{}
 foreach($name in @('Linux','Windows')){
@@ -133,15 +141,20 @@ foreach($name in @('Linux','Windows')){
     $hosts[$name]=[ordered]@{triple=$hostTriple;bootstrap=@{url="https://static.rust-lang.org/rustup/archive/$($pin.rustup_version)/$hostTriple/rustup-init$suffix";sha256=$pin.hosts[$name].rustup_sha256};required=$required;optional=$optional;packager="bin/$hostTriple/r4xbuilder$suffix";catalog="bin/$hostTriple/module-catalog$suffix";packager_build_target=$(if($name -eq 'Windows'){'x86_64-windows-gnu'}else{'x86_64-linux-gnu'})}
 }
 $sdkInputs=@(foreach($relative in @('build.zig.zon','r4os/module_manifest.zig','r4os/import_spec.zig','r4os/startup_metadata.zig','r4os/module_capabilities.zig','r4os/rust_project.zig','r4os/rust_module_profile.json','r4os/rust_qualification.json','r4os/linker/r4os_module.ld','r4os/heap_runtime.zig','r4os/vm_allocator.zig','r4os/allocator_wait.zig','r4os/build.zig','Tools/ModuleCatalog/src/main.zig','Tools/ModuleCatalog/src/capabilities.zig','Tools/R4XBuilder/src/main.zig','Tools/Build-RustModule.ps1','Tools/RustBuildInputs.ps1','Tools/New-RustProject.ps1','Rust/Cargo.toml')){@{path=$relative;sha256=Source-Hash $SdkRoot $relative}}
-    foreach($directory in @('Rust/src','Templates')){foreach($relative in Source-Files $SdkRoot $directory){@{path=$relative;sha256=Source-Hash $SdkRoot $relative}}})
-$contractInputs=@(foreach($relative in @('build.zig.zon','Module/CpuBaseline.json','Generated/SDK/Rust/Cargo.toml','Generated/SDK/Rust/src/lib.rs')){@{path=$relative;sha256=Source-Hash $ContractRoot $relative}})
+    foreach($directory in @('Rust/src','Templates','Shared/C','Shared/Generated/R4STD_Grapheme','r4os','Tools/CFacadeGen')){foreach($relative in Source-Files $SdkRoot $directory){@{path=$relative;sha256=Source-Hash $SdkRoot $relative}}})
+$contractInputs=@(foreach($relative in @('build.zig.zon','Module/CpuBaseline.json','Generated/SDK/Rust/Cargo.toml','Generated/SDK/Rust/src/lib.rs')){@{path=$relative;sha256=Source-Hash $ContractRoot $relative}}
+    foreach($directory in @('Generated/SDK/C','Generated/SDK/Zig')){foreach($relative in Source-Files $ContractRoot $directory){@{path=$relative;sha256=Source-Hash $ContractRoot $relative}}})
 $files=@(foreach($dir in @('Setup','Profile','bin','Runtime')){Get-ChildItem -LiteralPath (Join-Path $Destination $dir) -File -Recurse|Sort-Object FullName|ForEach-Object {@{path=[IO.Path]::GetRelativePath($Destination,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=Hash $_.FullName}}})
 $exportedRustProfile=[ordered]@{schema=1;id=$pin.profiles.sdk.id;scope='pinned tools, not a Rust module build capability';technical=[bool]$Technical;
     sdk=@{version=Version $SdkRoot;source=$sdkSource;inputs=$sdkInputs;rust_crate=Crate $SdkRoot 'Rust/Cargo.toml';packager_source_sha256=Source-Hash $SdkRoot 'Tools/R4XBuilder/src/main.zig'};
     contract=@{version=Version $ContractRoot;source=$contractSource;inputs=$contractInputs;binding_crate=Crate $ContractRoot 'Generated/SDK/Rust/Cargo.toml';cpu_baseline='Profile/CpuBaseline.json'};
     devkit=$devKitSource;rust_version=$pin.rust_version;cargo_version=$pin.cargo_version;rustup_version=$pin.rustup_version;
     release_manifest=@{path='Profile/rust-release.toml';url="https://static.rust-lang.org/dist/channel-rust-$($pin.rust_version).toml";sha256=$pin.manifest_sha256};
-    bare_target=$pin.kernel_target;hosts=$hosts;runtime=@{heap=@{path='Runtime/r4sdk_heap.o';sha256=Hash $HeapRuntime;cpu_baseline_sha256=Source-Hash $ContractRoot 'Module/CpuBaseline.json'}};template_root='Profile/Templates';required_components=$pin.profiles.sdk.required_components;optional_components=$pin.profiles.sdk.optional_components;rust_src_required=$false;files=$files}
+    bare_target=$pin.kernel_target;hosts=$hosts;runtime=@{
+        heap=@{path='Runtime/r4sdk_heap.o';sha256=Hash $HeapRuntime;cpu_baseline_sha256=Source-Hash $ContractRoot 'Module/CpuBaseline.json'};
+        facades=@{path='Runtime/r4sdk_facades.o';sha256=Hash $FacadeRuntime;cpu_baseline_sha256=Source-Hash $ContractRoot 'Module/CpuBaseline.json'};
+        storage=@{path='Runtime/r4sdk_storage.o';sha256=Hash $StorageRuntime;cpu_baseline_sha256=Source-Hash $ContractRoot 'Module/CpuBaseline.json'}
+    };template_root='Profile/Templates';required_components=$pin.profiles.sdk.required_components;optional_components=$pin.profiles.sdk.optional_components;rust_src_required=$false;files=$files}
 [IO.File]::WriteAllText((Join-Path $Destination 'RustToolsProfile.json'),($exportedRustProfile|ConvertTo-Json -Depth 20)+"`n",$utf8)
 $readme=@'
 R4OS pinned Rust tools

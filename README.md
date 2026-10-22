@@ -109,13 +109,14 @@ DevKit profile and its extra components remain available.
 
 The producer exports a separately usable toolset from clean source repositories:
 
-    pwsh -File Setup/Export-RustTools.ps1 -Destination /absolute/toolset -PackagerLinux /path/r4xbuilder -PackagerWindows /path/r4xbuilder.exe -CatalogLinux /path/module-catalog -CatalogWindows /path/module-catalog.exe -HeapRuntime /path/r4sdk_heap.o
+    pwsh -File Setup/Export-RustTools.ps1 -Destination /absolute/toolset -PackagerLinux /path/r4xbuilder -PackagerWindows /path/r4xbuilder.exe -CatalogLinux /path/module-catalog -CatalogWindows /path/module-catalog.exe -HeapRuntime /path/r4sdk_heap.o -FacadeRuntime /path/r4sdk_facades.o -StorageRuntime /path/r4sdk_storage.o
 
 The SDK packagers are built by the publisher with pinned Zig; users receive
 ELF64/PE32+ x86_64 executables and do not need Zig for these tools. The exporter
 copies this same installer and thin launchers, the single toolchain pin, exact
 Rust release component URLs/hashes, CPU baseline, both packagers and both ModuleCatalog executables. The
 versioned `RustToolsProfile.json` records source commits, SDK/Contract versions,
+all three SDK runtime objects and their canonical CPU/source identities,
 required versus optional components and every input file hash. From0.86.36 it
 also binds the selected SDK builder/runtime/profile and Contract binding inputs;
 the SDK driver rejects a mismatched source package. Exported Profile/Templates
