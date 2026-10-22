@@ -109,7 +109,7 @@ DevKit profile and its extra components remain available.
 
 The producer exports a separately usable toolset from clean source repositories:
 
-    pwsh -File Setup/Export-RustTools.ps1 -Destination /absolute/toolset -PackagerLinux /path/r4xbuilder -PackagerWindows /path/r4xbuilder.exe -CatalogLinux /path/module-catalog -CatalogWindows /path/module-catalog.exe
+    pwsh -File Setup/Export-RustTools.ps1 -Destination /absolute/toolset -PackagerLinux /path/r4xbuilder -PackagerWindows /path/r4xbuilder.exe -CatalogLinux /path/module-catalog -CatalogWindows /path/module-catalog.exe -HeapRuntime /path/r4sdk_heap.o
 
 The SDK packagers are built by the publisher with pinned Zig; users receive
 ELF64/PE32+ x86_64 executables and do not need Zig for these tools. The exporter
@@ -130,7 +130,8 @@ components, profile/pin hashes and the selected linker's SHA256. A complete
 export and installed compiler are separate facts (`toolset_metadata_present`
 and `complete_toolset`). The raw tool runner is not the module build driver:
 Cargo.lock, offline dependencies and rejection of project/global profile or
-flag overrides are specified in Contract/Module/RustModuleV1.txt and enforced
+flag overrides and explicit SDK release settings are specified in
+Contract/Module/RustModuleV2.txt and enforced
 by the matched SDK module builder.
 
 Linux qualification in 0.86.34 used an empty installation root with spaces and
